@@ -1,74 +1,89 @@
-const redux = require('redux')
+const redux = require('redux');
+const reduxLogger = require('redux-logger');
+const thunkMiddleware = require('redux-thunk')
+const axios = require('axios');
 const createStore = redux.createStore;
-const combineReducers = redux.combineReducers;
-// console.log('combineReducers', combineReducers);
-// Action //customer
-const BUY_CAKE = "BUY_CAKE";
-const BUY_ICECREAM = "BUY_ICECREAM"
+const applyMiddleware = redux.applyMiddleware;
+const logger = reduxLogger.createLogger();
 
-// action creator is a function that returns an action
+const middlewares = [];
+if (process.env.NODE_ENV === 'development') {
+  middlewares.push(logger);
+}
 
-function buyCake(data) {
+// state initilization
+
+const InitialState = {
+    loading:true,
+    data: [],
+    error: ''
+ }
+
+//  actions
+
+const FETCH_USERS_REQUEST = "FETCH_USERS_REQUEST";
+const FETCH_USERS_SUCCESS = "FETCH_USERS_SUCCESS";
+const FETCH_USERS_FAILURE = "FETCH_USERS_FAILURE";
+
+// actions creators 
+
+const fetchUsersRequest = () => {
     return {
-        type: BUY_CAKE,
-        payload: {
-            name: "adarsh",
-            userId: 1
-        }
+        type: FETCH_USERS_REQUEST
     }
-}
+};
 
-function buyIcecream() {
+const fetchUsersSuccess = (users) => {
     return {
-        type: BUY_ICECREAM
+        type: FETCH_USERS_SUCCESS,
+        payload: users
     }
-}
+};
 
-// shopkeeper // reducer
+const fetchUsersFailure = (error) => {
+    return {
+        type: FETCH_USERS_FAILURE,
+        payload: error
+    }
+};
 
-// (prevState, action) => newState
+// reducers 
 
-const cakeState = {
-    numOfCakes : 10
-}
-
-const iceCreamState = {
-    numOfIceCreams: 20
-}
-
-const CakeReducer = ( state = cakeState, action) => {
+const reducer = (state = InitialState, action) => {
     switch(action.type) {
-        case BUY_CAKE: return {
+        case FETCH_USERS_REQUEST: 
+        return {
             ...state,
-            numOfCakes: state.numOfCakes - 1
+            loading: true
         }
-        default: return state
+        case FETCH_USERS_SUCCESS :
+        return {
+            loading: false,
+            data : action.payload,
+            error: ''
+        }
+        case FETCH_USERS_FAILURE : 
+        return {
+            loading: false,
+            data: [],
+            error: action.payload
+        }
     }
 }
 
-const IceCreamReducer = ( state = iceCreamState, action) => {
-    switch(action.type) {
-        case BUY_ICECREAM: return {
-            ...state,
-            numOfIceCreams: state.numOfIceCreams - 1
-        }
-        default: return state
+// api calling
+
+const fetchUsers = () => {
+    return function(dispatch) {
+        dispatch(fetchUsersRequest)
+        axios.get('https://jsonplaceholder.typicode.com/posts').then(response => {
+            const data = response.data;
+            dispatch(fetchUsersSuccess(data))
+        }).catch(error => {
+            dispatch(fetchUsersFailure(error))
+        })
     }
 }
 
-const rootReducer = combineReducers({
-    CakeReducer: CakeReducer,
-    IceCreamReducer: IceCreamReducer
-})
-
-// shop store
-// It will create a redux store instance for your application
-const store = createStore(rootReducer);
-
-console.log('Initial State', store.getState());
-store.dispatch(buyCake());
-console.log('Updated State', store.getState());
-store.dispatch(buyCake("adarsh"));
-store.dispatch(buyIcecream());
-console.log('After all Updated State', store.getState());
-
+const store = createStore(reducer, applyMiddleware(...middlewares, thunkMiddleware));
+store.dispatch(fetchUsers);
